@@ -1,0 +1,39 @@
+from flask import Flask, request, jsonify
+import os
+import pandas as pd
+
+app = Flask(__name__)
+
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+@app.route('/process-csv', methods=['POST'])
+def process_csv():
+    # Get uploaded file and filter data
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+    start_date = request.form['startDate']
+    end_date = request.form['endDate']
+    chart_type = request.form['chartType']
+
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    file.save(file_path)
+
+    # Process CSV
+    df = pd.read_csv(file_path)
+    df['Date'] = pd.to_datetime(df['Date'])  # Assuming 'Date' column exists
+    mask = (df['Date'] >= start_date) & (df['Date'] <= end_date)
+    filtered_df = df.loc[mask]
+
+    labels = filtered_df['Date'].dt.strftime('%Y-%m-%d').tolist()
+    values = filtered_df['Sales'].tolist()  # Assuming 'Sales' column exists
+
+    return jsonify({'labels': labels, 'values': values})
+
+if __name__ == '__main__':
+    app.run(debug=True)
